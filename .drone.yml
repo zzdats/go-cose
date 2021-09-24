@@ -1,0 +1,48 @@
+---
+kind: pipeline
+type: docker
+name: default
+
+steps:
+  - name: lint
+    image: golang:1.17
+    pull: always
+    commands:
+      - "go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.1"
+      - "go install honnef.co/go/tools/cmd/staticcheck@latest"
+      - "golangci-lint run --timeout=3m"
+      - "golangci-lint run --timeout=3m --issues-exit-code=0 -E dupl -E gocritic -E gosimple -E lll -E prealloc"
+      - "go vet ./..."
+      - "staticcheck ./..."
+    when:
+      event:
+        - push
+        - pull_request
+
+  - name: test
+    image: golang:1.17
+    commands:
+      - "go test -v -cover -race -coverprofile=coverage.out"
+    depends_on:
+      - lint
+    when:
+      event:
+        - push
+        - pull_request
+
+  - name: coverage
+    pull: always
+    image: robertstettner/drone-codecov
+    settings:
+      files:
+        - coverage.out
+    environment:
+      CODECOV_TOKEN:
+        from_secret: codecov_token
+    depends_on:
+      - test
+    when:
+      branch:
+        - main
+      event:
+        - push
