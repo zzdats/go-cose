@@ -13,3 +13,6 @@
 
 # Dependency directories
 vendor/
+
+# Test data
+test-data/

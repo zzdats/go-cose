@@ -62,8 +62,10 @@ func newSign1Message(e *Encoding, c *sign1Message) (*Sign1Message, error) {
 	}
 
 	var prot map[interface{}]interface{}
-	if err := e.decMode.Unmarshal(c.Protected, &prot); err != nil {
-		return nil, err
+	if len(c.Protected) > 0 {
+		if err := e.decMode.Unmarshal(c.Protected, &prot); err != nil {
+			return nil, err
+		}
 	}
 	for k, v := range prot {
 		if err := m.Headers.SetProtected(k, v); err != nil {

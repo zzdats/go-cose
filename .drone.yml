@@ -21,7 +21,10 @@ steps:
 
   - name: test
     image: golang:1.17
+    environment:
+      TEST_DGC: "true"
     commands:
+      - "git clone https://github.com/eu-digital-green-certificates/dgc-testdata.git test-data/dgc"
       - "go test -v -cover -race -coverprofile=coverage.out"
     depends_on:
       - lint

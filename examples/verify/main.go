@@ -24,7 +24,7 @@ const coseData = `d28443a10126a104484dfc0b3070d7230b59015ca401624c56041a62a9939b
 // }
 
 func parseKey() (crypto.PublicKey, error) {
-	data, err := base64.RawStdEncoding.DecodeString(pubCertData)
+	data, err := base64.StdEncoding.DecodeString(pubCertData)
 	if err != nil {
 		return nil, err
 	}
