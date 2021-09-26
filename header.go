@@ -30,6 +30,30 @@ func NewHeaders() *Headers {
 	}
 }
 
+func newHeaders(e *Encoding, protected []byte, unprotected map[interface{}]interface{}) (*Headers, error) {
+	h := NewHeaders()
+
+	for k, v := range unprotected {
+		if err := h.Set(k, v); err != nil {
+			return nil, err
+		}
+	}
+
+	var prot map[interface{}]interface{}
+	if len(protected) > 0 {
+		if err := e.decMode.Unmarshal(protected, &prot); err != nil {
+			return nil, err
+		}
+	}
+	for k, v := range prot {
+		if err := h.SetProtected(k, v); err != nil {
+			return nil, err
+		}
+	}
+
+	return h, nil
+}
+
 // MergeHeaders merges the given headers into the new Headers instance.
 func MergeHeaders(h1, h2 *Headers) *Headers {
 	h := NewHeaders()
@@ -41,6 +65,9 @@ func MergeHeaders(h1, h2 *Headers) *Headers {
 
 // Merge merges the given headers into the current headers.
 func (h *Headers) Merge(other *Headers) {
+	if other == nil {
+		return
+	}
 	for k, v := range other.protected {
 		h.protected[k] = v
 	}

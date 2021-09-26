@@ -73,6 +73,13 @@ func NewEncoding() (*Encoding, error) {
 	); err != nil {
 		return nil, err
 	}
+	if err = tags.Add(
+		cbor.TagOptions{EncTag: cbor.EncTagRequired, DecTag: cbor.DecTagRequired},
+		reflect.TypeOf(SignMessage{}),
+		MessageTagSign,
+	); err != nil {
+		return nil, err
+	}
 	decOptions := cbor.DecOptions{
 		IndefLength: cbor.IndefLengthForbidden,
 		IntDec:      cbor.IntDecConvertSigned,
@@ -89,31 +96,17 @@ func (e *Encoding) EncodeWithExternal(message Message, external []byte) ([]byte,
 	var m interface{}
 	switch msg := message.(type) {
 	case *Sign1Message:
-		sheaders, err := msg.Signer.GetHeaders()
+		sm, err := msg.sign(e, external)
 		if err != nil {
 			return nil, err
 		}
-		h := MergeHeaders(msg.Headers, sheaders)
-
-		ph, err := e.marshal(h.protected)
+		m = sm
+	case *SignMessage:
+		sm, err := msg.sign(e, external)
 		if err != nil {
 			return nil, err
 		}
-
-		s1m := sign1Message{
-			Protected:   ph,
-			Unprotected: h.unprotected,
-			Payload:     msg.GetContent(),
-		}
-		digest, err := s1m.GetDigest(e, external)
-		if err != nil {
-			return nil, err
-		}
-		if s1m.Signature, err = msg.Signer.Sign(e.rand, digest); err != nil {
-			return nil, err
-		}
-
-		m = s1m
+		m = sm
 	default:
 		return nil, ErrUnsupportedMessageTag{message.GetMessageTag()}
 	}
@@ -123,6 +116,29 @@ func (e *Encoding) EncodeWithExternal(message Message, external []byte) ([]byte,
 // Encode encodes the given message
 func (e *Encoding) Encode(message Message) ([]byte, error) {
 	return e.EncodeWithExternal(message, []byte{})
+}
+
+func verifySignature(config *Config, headers *Headers, digest, signature []byte) error {
+	var err error
+	var verifiers []*Verifier
+	if config != nil {
+		verifiers, err = config.GetVerifiers(headers)
+	}
+
+	if err == nil {
+		if len(verifiers) == 0 {
+			err = ErrVerification
+		} else {
+			var verr error
+			for _, v := range verifiers {
+				if verr = v.Verify(digest, signature); verr == nil {
+					break
+				}
+			}
+			err = verr
+		}
+	}
+	return err
 }
 
 // DecodeWithExternal decodes the given data with the given external data
@@ -144,30 +160,42 @@ func (e *Encoding) DecodeWithExternal(data, external []byte, config *Config) (Me
 			return nil, err
 		}
 
-		var verifiers []*Verifier
-		if config != nil {
-			verifiers, err = config.GetVerifiers(msg.Headers)
+		var digest []byte
+		digest, err = c.GetDigest(e, external)
+		if err != nil {
+			return msg, err
 		}
 
-		if err == nil {
-			if len(verifiers) == 0 {
-				err = ErrVerification
-			} else {
-				var digest []byte
-				digest, err = c.GetDigest(e, external)
-				if err == nil {
-					var verr error
-					for _, v := range verifiers {
-						if verr = v.Verify(digest, c.Signature); verr == nil {
-							break
-						}
-					}
-					err = verr
-				}
+		return msg, verifySignature(config, msg.Headers, digest, c.Signature)
+	case MessageTagSign:
+		var c signMessage
+		if err := e.decMode.Unmarshal(raw.Content, &c); err != nil {
+			return nil, err
+		}
+
+		msg, err := newSignMessage(e, &c)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, sig := range c.Signatures {
+			var digest []byte
+			digest, err = c.GetDigest(e, sig.Protected, external)
+			if err != nil {
+				return msg, err
+			}
+
+			sheaders, err := newHeaders(e, sig.Protected, sig.Unprotected)
+			if err != nil {
+				return msg, err
+			}
+
+			if err = verifySignature(config, MergeHeaders(msg.Headers, sheaders), digest, sig.Signature); err != nil {
+				return msg, err
 			}
 		}
 
-		return msg, err
+		return msg, nil
 	default:
 		return nil, ErrUnsupportedMessageTag{raw.Number}
 	}

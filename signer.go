@@ -22,6 +22,7 @@ import (
 
 // Signer represents a signer with a private key and algorithm
 type Signer struct {
+	Headers    *Headers
 	privateKey crypto.PrivateKey
 	alg        *algorithm
 }
@@ -61,6 +62,7 @@ func NewSigner(alg Algorithm, key crypto.PrivateKey) (*Signer, error) {
 	}
 
 	return &Signer{
+		Headers:    NewHeaders(),
 		privateKey: key,
 		alg:        a,
 	}, nil
@@ -78,7 +80,7 @@ func (s *Signer) GetHeaders() (*Headers, error) {
 		return nil, err
 	}
 
-	return h, nil
+	return MergeHeaders(s.Headers, h), nil
 }
 
 // ToVerifier returns the public key verifier for the signer

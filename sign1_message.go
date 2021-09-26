@@ -7,7 +7,7 @@ package cose
 // Sign1Message represents a COSE_Sign1 message.
 type Sign1Message struct {
 	Headers *Headers
-	Signer  *Signer
+	signer  *Signer
 	content []byte
 }
 
@@ -33,6 +33,38 @@ func (m *Sign1Message) SetContent(content []byte) {
 	m.content = content
 }
 
+// SetSigner sets the signer.
+func (m *Sign1Message) SetSigner(signer *Signer) {
+	m.signer = signer
+}
+
+func (m *Sign1Message) sign(e *Encoding, external []byte) (interface{}, error) {
+	sheaders, err := m.signer.GetHeaders()
+	if err != nil {
+		return nil, err
+	}
+	h := MergeHeaders(m.Headers, sheaders)
+
+	ph, err := e.marshal(h.protected)
+	if err != nil {
+		return nil, err
+	}
+
+	msg := sign1Message{
+		Protected:   ph,
+		Unprotected: h.unprotected,
+		Payload:     m.GetContent(),
+	}
+	digest, err := msg.GetDigest(e, external)
+	if err != nil {
+		return nil, err
+	}
+	if msg.Signature, err = m.signer.Sign(e.rand, digest); err != nil {
+		return nil, err
+	}
+	return msg, nil
+}
+
 type sign1Message struct {
 	_           struct{} `cbor:",toarray"`
 	Protected   []byte
@@ -51,26 +83,13 @@ func (m *sign1Message) GetDigest(e *Encoding, external []byte) ([]byte, error) {
 }
 
 func newSign1Message(e *Encoding, c *sign1Message) (*Sign1Message, error) {
-	m := &Sign1Message{
-		Headers: NewHeaders(),
-		content: c.Payload,
-	}
-	for k, v := range c.Unprotected {
-		if err := m.Headers.Set(k, v); err != nil {
-			return nil, err
-		}
+	h, err := newHeaders(e, c.Protected, c.Unprotected)
+	if err != nil {
+		return nil, err
 	}
 
-	var prot map[interface{}]interface{}
-	if len(c.Protected) > 0 {
-		if err := e.decMode.Unmarshal(c.Protected, &prot); err != nil {
-			return nil, err
-		}
-	}
-	for k, v := range prot {
-		if err := m.Headers.SetProtected(k, v); err != nil {
-			return nil, err
-		}
-	}
-	return m, nil
+	return &Sign1Message{
+		Headers: h,
+		content: c.Payload,
+	}, nil
 }

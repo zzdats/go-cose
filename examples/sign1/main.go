@@ -21,9 +21,12 @@ func main() {
 	msg := cose.NewSign1Message()
 	msg.SetContent([]byte("test"))
 	// Add signer
-	if msg.Signer, err = cose.NewSigner(cose.AlgorithmPS256, key); err != nil {
+	signer, err := cose.NewSigner(cose.AlgorithmPS256, key)
+	if err != nil {
 		panic(err)
 	}
+	msg.SetSigner(signer)
+
 	// Encode to COSE byte array
 	b, err := cose.StdEncoding.Encode(msg)
 	if err != nil {
@@ -38,7 +41,7 @@ func main() {
 		GetVerifiers: func(headers *cose.Headers) ([]*cose.Verifier, error) {
 			// You can use kid or some other info from headers to detect needed verification certificate
 			// or just provide static verifier
-			verifier, err := msg.Signer.ToVerifier()
+			verifier, err := signer.ToVerifier()
 			if err != nil {
 				return nil, err
 			}

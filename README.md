@@ -10,6 +10,7 @@ A [COSE](https://tools.ietf.org/html/rfc8152) library for Go.
 ## Supported COSE messages
 
 * COSE Single Signer Data Object `cose-sign1`
+* COSE Signed Data Object `cose-sign`
 
 ### Supported COSE algorithms
 
