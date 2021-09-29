@@ -64,6 +64,11 @@ func (v *Verifier) GetHash() crypto.Hash {
 	return v.alg.Hash
 }
 
+// GetPublicKey returns the public key used by the verifier.
+func (v *Verifier) GetPublicKey() crypto.PublicKey {
+	return v.publicKey
+}
+
 // Verify verifies a COSE signature.
 func (v *Verifier) Verify(digest, sig []byte) error {
 	hash := v.GetHash()
@@ -78,7 +83,7 @@ func (v *Verifier) Verify(digest, sig []byte) error {
 		digest = h.Sum(nil)
 	}
 
-	switch key := v.publicKey.(type) {
+	switch key := v.GetPublicKey().(type) {
 	case *rsa.PublicKey:
 		err := rsa.VerifyPSS(key, hash, digest, sig, &rsa.PSSOptions{
 			SaltLength: rsa.PSSSaltLengthEqualsHash,

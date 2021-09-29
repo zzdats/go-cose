@@ -20,14 +20,14 @@ import (
 	_ "crypto/sha256"
 )
 
-// Signer represents a signer with a private key and algorithm
+// Signer represents a signer with a private key and algorithm.
 type Signer struct {
 	Headers    *Headers
 	privateKey crypto.PrivateKey
 	alg        *algorithm
 }
 
-// NewSigner creates a new signer with a private key and algorithm
+// NewSigner creates a new signer with a private key and algorithm.
 func NewSigner(alg Algorithm, key crypto.PrivateKey) (*Signer, error) {
 	if key == nil {
 		return nil, errors.New("key can not be nil")
@@ -68,12 +68,17 @@ func NewSigner(alg Algorithm, key crypto.PrivateKey) (*Signer, error) {
 	}, nil
 }
 
-// GetHash returns the hash algorithm of the signer
+// GetHash returns the hash algorithm of the signer.
 func (s *Signer) GetHash() crypto.Hash {
 	return s.alg.Hash
 }
 
-// GetHeader returns the headers for message signature
+// GetPrivateKey returns the private key used by the signer.
+func (s *Signer) GetPrivateKey() crypto.PrivateKey {
+	return s.privateKey
+}
+
+// GetHeader returns the headers for message signature.
 func (s *Signer) GetHeaders() (*Headers, error) {
 	h := NewHeaders()
 	if err := h.SetProtected(HeaderAlgorithm, s.alg.Value); err != nil {
@@ -83,9 +88,9 @@ func (s *Signer) GetHeaders() (*Headers, error) {
 	return MergeHeaders(s.Headers, h), nil
 }
 
-// ToVerifier returns the public key verifier for the signer
+// ToVerifier returns the public key verifier for the signer.
 func (s *Signer) ToVerifier() (*Verifier, error) {
-	switch k := s.privateKey.(type) {
+	switch k := s.GetPrivateKey().(type) {
 	case *rsa.PrivateKey:
 		return NewVerifier(Algorithm(s.alg.Name), k.Public())
 	case *ecdsa.PrivateKey:
@@ -96,7 +101,7 @@ func (s *Signer) ToVerifier() (*Verifier, error) {
 	return nil, ErrUnsupportedKeyType
 }
 
-// Sign signs the message with the private key using the algorithm
+// Sign signs the message with the private key using the algorithm.
 func (s *Signer) Sign(rand io.Reader, digest []byte) ([]byte, error) {
 	hash := s.GetHash()
 	// calculate the hash of the message, if the algorithm requires it
@@ -110,7 +115,7 @@ func (s *Signer) Sign(rand io.Reader, digest []byte) ([]byte, error) {
 		digest = h.Sum(nil)
 	}
 
-	switch key := s.privateKey.(type) {
+	switch key := s.GetPrivateKey().(type) {
 	case *rsa.PrivateKey:
 		return rsa.SignPSS(rand, key, hash, digest, &rsa.PSSOptions{
 			SaltLength: rsa.PSSSaltLengthEqualsHash,

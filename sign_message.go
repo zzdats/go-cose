@@ -1,3 +1,7 @@
+// Copyright 2021 SIA ZZ Dats. All rights reserved.
+// Use of this source code is governed by a MIT-style
+// license that can be found in the LICENSE file.
+
 package cose
 
 // SignMessage represents a COSE_Sign message.

@@ -41,6 +41,8 @@ type Encoding struct {
 type Config struct {
 	// GetVerifiers returns the verifiers for the given message signature
 	GetVerifiers func(*Headers) ([]*Verifier, error)
+	// Verified callback
+	Verified func(*Verifier)
 }
 
 var (
@@ -132,6 +134,9 @@ func verifySignature(config *Config, headers *Headers, digest, signature []byte)
 			var verr error
 			for _, v := range verifiers {
 				if verr = v.Verify(digest, signature); verr == nil {
+					if config != nil && config.Verified != nil {
+						config.Verified(v)
+					}
 					break
 				}
 			}
